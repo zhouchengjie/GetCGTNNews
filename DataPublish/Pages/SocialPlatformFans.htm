@@ -1,0 +1,332 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>三大新闻媒体监测数据</title>
+<link rel="stylesheet" href="layui/css/layui.css" />
+<link href="css/common.css" rel="stylesheet" type="text/css" />
+<script src="layui/jquery_2-1-0_min.js" type="text/javascript"></script>
+<script src="layui-new/layui.js" type="text/javascript"></script>
+
+<link rel="stylesheet" type="text/css" href="webuploader/webuploader.css">
+<script type="text/javascript" src="webuploader/webuploader.js"></script>
+
+<style type="text/css">
+.crightSearch{position:relative; width:100%; padding-right:120px;}
+.crightSearchBtn{position:absolute;right:0px; top:105px;}
+.Input_Date {width:270px;}
+.InputDateInco{position:absolute; left:245px; top:11px; z-index:0;}
+.LoadingBg{position:fixed; left:0; top:0; background:rgba(0,0,0,0.3);width:100%; height:100%; z-index:999; text-align:center;}
+.LoadingMain{position:absolute;color:#fff;height:32px; line-height:32px; top:50%; margin-top:-16px; width:500px;left:50%; margin-left:-250px;}
+.LoadingMain img{margin-right:10px; vertical-align:middle;}
+</style>
+
+<script type="text/javascript" language="javascript">
+    layui.use(['element','form','layer'], function () {
+        var element = layui.element;
+        var form = layui.form;
+        var layer = layui.layer;
+    });
+
+    layui.use(['laydate'], function () {
+        var laydate = layui.laydate;
+        laydate.render({
+            elem: '#calDateRange'
+          , type: 'datetime'
+          , range: true //或 range: '~' 来自定义分割字符
+        });
+
+        laydate.render({
+            elem: '#calSelectedDate'
+          , range: false //或 range: '~' 来自定义分割字符
+          , format: 'yyyy-MM-dd'
+        });
+    });
+
+    $(function () {
+        $("#btnSearch").click(function () {
+            Search();
+        });
+
+        Search();
+
+    });
+
+    function ShowUpdateStatus() {
+        $("#tbUpdateStatus").empty();
+        $("#tbUpdateStatus").append("<tr><td colspan=\"4\" class=\"No_Search\"><img src=\"images/loading.gif\"/>正在获取中，请耐心等待...</td></tr>");
+        var date = new Date();
+        var url = '../Logic/CGTNNewsData.ashx';
+        $.ajax({
+            url: url,
+            data: {
+                type: 20,
+                date: date
+            },
+            dataType: "json",
+            type: "GET",
+            traditional: true,
+            success: function (data) {
+                $("#tbUpdateStatus").empty();
+                $.each(data, function (i, item) {
+                        var str = "<tr>";
+                        str += ("<td>" + item.APP + "</td>");
+                        str += ("<td>" + jsonDateFormat(item.ReleaseDate) + "</td>");
+                        str += ("<td>" + jsonDateTimeFormat(item.CreateTime) + "</td>");
+                        str += ("<td>" + item.StatusName + "</td>");
+                        str += "</tr>";
+                        $("#tbUpdateStatus").append(str);
+                });
+
+                layer.open({
+                    type: 1,
+                    shade: false,
+                    title: "今日数据更新状态",
+                    area: ['600px', '220px'], //宽高
+                    content: $('#tableUpdateStatus')
+                });
+            },
+            error: function (e) {
+            }
+        });
+
+        
+    }
+
+    function Search() {
+
+        layui.use('table', function () {
+            var table = layui.table;
+            //第一个实例
+            var date = new Date().toUTCString();
+            var typeID = $("#ddlTypeID").val();
+            var calDateRange = $("#calDateRange").val();
+            var keyword = $("#txtKeywords").val();
+            $("#txtRecordNumber").text("-");
+            table.render({
+                elem: '#datalist'
+                , url: '../Logic/CGTNNewsData.ashx?type=24&date=' + date //数据接口
+                , where: { typeID: typeID, period: calDateRange, keyword: keyword }
+                , page: true //开启分页
+                , limit: 100
+                , limits: [20, 50, 100, 200]
+                , cols: [[ //表头
+                    {field: 'Platform', title: 'Platform', width: 200 }
+                  , { field: 'Account', title: 'Account', width: 200 }
+                  , { field: 'FollowerCount', title: 'FollowerCount', width: 200 }
+                  , { field: 'PostCount', title: 'PostCount', width: 200 }
+                  , { field: 'ViewCount', title: 'ViewCount', width: 200 }
+                  , { field: 'LikeCount', title: 'LikeCount', width: 200 }
+                  , { field: 'Url', title: 'Url', width: 300 }
+                  , { field: 'CreateTimeText', title: 'CreateTime', width: 200 }
+                ]]
+                , done: function (res, curr, count) {
+                    $("#txtRecordNumber").text(count);
+                }
+            });
+        });
+    }
+
+    function DoDownload() {
+        var typeID = $("#ddlTypeID").val();
+        var calDateRange = $("#calDateRange").val();
+        var keyword = $("#txtKeywords").val();
+        var date = new Date();
+        var url = '../Logic/CGTNNewsData.ashx';
+        $.ajax({
+            url: url,
+            data: {
+                type: 25,
+                typeID: typeID, 
+                period: calDateRange,
+                keyword: keyword
+            },
+            dataType: "text",
+            type: "GET",
+            traditional: true,
+            success: function (data) {
+                if (data == "0") {
+                    layer.alert("下载失败！");
+                }
+                else {
+                    window.open(data, "_parent");
+                }
+            },
+            error: function (e) {
+                layer.alert("下载失败！");
+            }
+        });
+    }
+
+    function JSONLength(obj) {
+        var size = 0, key;
+        for (key in obj) {
+            if (obj.hasOwnProperty(key)) size++;
+        }
+        return size;
+    }
+
+    function jsonDateFormat(jsonDate) {//json日期格式转换为正常格式
+        try {
+            var date = new Date(parseInt(jsonDate.replace("/Date(", "").replace(")/", ""), 10));
+            var month = date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1) : date.getMonth() + 1;
+            var day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
+            var hours = date.getHours();
+            var minutes = date.getMinutes();
+            var seconds = date.getSeconds();
+            var milliseconds = date.getMilliseconds();
+            if (date.getFullYear() <= 1) {
+                return "";
+            }
+            else {
+                return date.getFullYear() + "-" + month + "-" + day;
+            }
+        } catch (ex) {
+            return "";
+        }
+    }
+    function jsonDateTimeFormat(jsonDateTime) {//json日期格式转换为正常格式
+        try {
+            var date = new Date(parseInt(jsonDateTime.replace("/Date(", "").replace(")/", ""), 10));
+            var month = date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1) : date.getMonth() + 1;
+            var day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
+            var hours = date.getHours() < 10 ? "0" + date.getHours() : date.getHours();
+            var minutes = date.getMinutes() < 10 ? "0" + date.getMinutes() : date.getMinutes();
+            var seconds = date.getSeconds() < 10 ? "0" + date.getSeconds() : date.getSeconds();
+            var milliseconds = date.getMilliseconds();
+            return date.getFullYear() + "-" + month + "-" + day + " " + hours + ":" + minutes + ":" + seconds;
+        } catch (ex) {
+            return "";
+        }
+    }
+
+    function DoDownloadWeibo() {
+        var selectedDate = $("#calSelectedDate").val();
+        var cbxIsNoon = $("#cbxIsNoon").prop("checked");
+        var date = new Date();
+        var url = '../Logic/CGTNNewsData.ashx';
+        $.ajax({
+            url: url,
+            data: {
+                type: 21,
+                selectedDate: selectedDate,
+                cbxIsNoon : cbxIsNoon,
+                date: date
+            },
+            dataType: "text",
+            type: "GET",
+            traditional: true,
+            success: function (data) {
+                if (data == "0") {
+                    layer.alert("未找到数据文件！");
+                }
+                else {
+                    window.open(data, "_parent");
+                }
+            },
+            error: function (e) {
+                layer.alert("下载失败！");
+            }
+        });
+    }
+
+    function ViewScreenshot() {
+        var date = new Date();
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var strDate = date.getFullYear() + "-" + month + "-" + day;
+        var url = "http://218.241.201.165:30008/Screenshots/" + strDate;
+        window.open(url);
+    }
+
+    function ViewCGTNScreenshot() {
+        var date = new Date();
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var strDate = date.getFullYear() + "-" + month + "-" + day;
+        var url = "http://218.241.201.165:30008/CGTNScreenshots/" + strDate;
+        window.open(url);
+    }
+</script>
+</head>
+<body class="layui-layout-body">
+<div class="layui-layout layui-layout-admin">
+<div class="layui-header">
+    <div class="layui-logo">主流媒体新闻监测数据</div>
+    <ul class="layui-nav layui-layout-left">
+        <li class="layui-nav-item">
+        <a href="javascript:;">国内媒体数据</a>
+        <dl class="layui-nav-child">
+            <dd><a href="NewsAPP.htm">新闻内容</a></dd>
+            <dd><a href="javascript:void(0)" onclick="ViewScreenshot();">微博截屏</a></dd>
+            <dd><a href="javascript:void(0)" onclick="ShowWeioDate();">微博结果</a></dd>
+            <dd><a href="javascript:void(0)" onclick="ShowUpdateStatus();">更新状态</a></dd>
+        </dl>
+        </li>
+        <li class="layui-nav-item">
+        <a href="javascript:;">国外媒体数据</a>
+        <dl class="layui-nav-child">
+            <dd><a href="CGTNTopNews.htm">官网头条</a></dd>
+            <dd><a href="AccountList.htm">社交账号</a></dd>
+            <dd><a href="SocialPlatformFans.htm">社交粉丝</a></dd>
+        </dl>
+        </li>
+    </ul>
+</div>
+<div class="layui-body-full" style="padding-top:60px;">
+<!-- 内容主体区域 -->
+<fieldset class="layui-elem-field layui-field-title">
+  <legend style="font-size:14px;">社交粉丝</legend>
+</fieldset>
+
+<div class="crightSearch">
+    <form class="layui-form" action="">
+    <div class="layui-form-item">
+        <div class="layui-inline">
+          <label class="layui-form-label">媒体类型：</label>
+          <div class="layui-input-inline">
+            <select id="ddlTypeID">
+                <option value="">默认不限</option>
+                <option value="Facebook">Facebook</option>
+                <option value="Twitter">Twitter</option>
+                <option value="YouTube">YouTube</option>
+                <option value="Instagram">Instagram</option>
+              </select>
+          </div>
+        </div>
+         <div class="layui-inline">
+            <label class="layui-form-label">时间周期：</label>
+            <div class="layui-input-inline">
+                <input class="layui-input Input_Date" style="width:330px;" placeholder="日期范围：默认今天" id="calDateRange"/>
+                <div class="InputDateInco"  style="left:300px;">
+				    <img src="images/InputDateInco.png" id="fromicon" alt=""/>
+				</div>
+            </div>
+        </div>  
+        <div class="layui-inline" style="padding-left:130px;">
+            <label class="layui-form-label">关键词：</label>
+            <div class="layui-input-inline">
+                <input class="layui-input Input_Date" placeholder="请输入检索关键词" id="txtKeywords"/>
+            </div>
+        </div>  
+      </div>
+    </form>
+</div>
+
+<div class="crightSearchBtn" style="padding-right:10px;">
+    <button class="layui-btn layui-btn-green" id="btnSearch" style="width:93px;">查 询</button>
+    <button class="layui-btn layui-btn-green" onclick="DoDownload();" id="btnDownload">下载结果</button>	
+</div>
+<fieldset class="layui-elem-field layui-field-title">
+  <legend style="font-size:14px;">查询结果</legend>
+</fieldset>
+<blockquote class="layui-elem-quote" style="margin-bottom:0px;"><p>根据您选择的条件，我们为您检索到 <span id="txtRecordNumber">-</span> 条记录</p></blockquote>
+<table id="datalist">
+</table>
+</div>
+
+</div>
+
+</body>
+</html>

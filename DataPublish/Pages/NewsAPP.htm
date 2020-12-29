@@ -1,0 +1,427 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>三大新闻客户端监测数据</title>
+<link rel="stylesheet" href="layui/css/layui.css" />
+<link href="css/common.css" rel="stylesheet" type="text/css" />
+<script src="layui/jquery_2-1-0_min.js" type="text/javascript"></script>
+<script src="layui/layui.js" type="text/javascript"></script>
+
+<link rel="stylesheet" type="text/css" href="webuploader/webuploader.css">
+<script type="text/javascript" src="webuploader/webuploader.js"></script>
+
+<style type="text/css">
+.crightSearch{position:relative; width:100%; padding-right:120px;}
+.crightSearchBtn{position:absolute;right:0px; top:105px;}
+.Input_Date {width:270px;}
+.InputDateInco{position:absolute; left:245px; top:11px; z-index:0;}
+.LoadingBg{position:fixed; left:0; top:0; background:rgba(0,0,0,0.3);width:100%; height:100%; z-index:999; text-align:center;}
+.LoadingMain{position:absolute;color:#fff;height:32px; line-height:32px; top:50%; margin-top:-16px; width:500px;left:50%; margin-left:-250px;}
+.LoadingMain img{margin-right:10px; vertical-align:middle;}
+</style>
+
+<script type="text/javascript" language="javascript">
+    layui.use(['element','form','layer'], function () {
+        var element = layui.element;
+        var form = layui.form;
+        var layer = layui.layer;
+    });
+
+    layui.use(['laydate'], function () {
+        var laydate = layui.laydate;
+        laydate.render({
+            elem: '#calDateRange'
+          , type: 'datetime'
+          , range: true //或 range: '~' 来自定义分割字符
+        });
+
+        laydate.render({
+            elem: '#calSelectedDate'
+          , range: false //或 range: '~' 来自定义分割字符
+          , format: 'yyyy-MM-dd'
+        });
+    });
+
+    $(function () {
+        $("#btnSearch").click(function () {
+            Search();
+        });
+
+        Search();
+
+    });
+
+    function ShowUpdateStatus() {
+        $("#tbUpdateStatus").empty();
+        $("#tbUpdateStatus").append("<tr><td colspan=\"4\" class=\"No_Search\"><img src=\"images/loading.gif\"/>正在获取中，请耐心等待...</td></tr>");
+        var date = new Date();
+        var url = '../Logic/NewsCatchData.ashx';
+        $.ajax({
+            url: url,
+            data: {
+                type: 20,
+                date: date
+            },
+            dataType: "json",
+            type: "GET",
+            traditional: true,
+            success: function (data) {
+                $("#tbUpdateStatus").empty();
+                $.each(data, function (i, item) {
+                        var str = "<tr>";
+                        str += ("<td>" + item.APP + "</td>");
+                        str += ("<td>" + jsonDateFormat(item.ReleaseDate) + "</td>");
+                        str += ("<td>" + jsonDateTimeFormat(item.CreateTime) + "</td>");
+                        str += ("<td>" + item.StatusName + "</td>");
+                        str += "</tr>";
+                        $("#tbUpdateStatus").append(str);
+                });
+
+                layer.open({
+                    type: 1,
+                    shade: false,
+                    title: "今日数据更新状态",
+                    area: ['600px', '220px'], //宽高
+                    content: $('#tableUpdateStatus')
+                });
+            },
+            error: function (e) {
+            }
+        });
+
+        
+    }
+
+    function Search() {
+
+        layui.use('table', function () {
+            var table = layui.table;
+            //第一个实例
+            var date = new Date().toUTCString();
+            var typeID = $("#ddlTypeID").val();
+            var calDateRange = $("#calDateRange").val();
+            var keyword = $("#txtKeywords").val();
+            $("#txtRecordNumber").text("-");
+            table.render({
+                elem: '#datalist'
+                , url: '../Logic/NewsCatchData.ashx?type=18&date=' + date //数据接口
+                , where: { typeID: typeID, period: calDateRange, keyword: keyword }
+                , page: true //开启分页
+                , limit: 100
+                , limits: [20, 50, 100, 200]
+                , cols: [[ //表头
+                    {field: 'APP', title: 'APP平台', width: 120 }
+                  , { field: 'Title', title: '标题', width: 300 }
+                  , { field: 'Source', title: '来源', width: 150 }
+                  , { field: 'ReleaseDateText', title: '发布时间', width: 200 }
+                  , { field: 'CreateTimeText', title: '采集时间', width: 200 }
+                  , { field: 'ViewCount', title: '阅读量', width: 100 }
+                  , { field: 'CommentCount', title: '评论量', width: 100 }
+                  , { field: 'LikeCount', title: '点赞量', width: 100 }
+                  , { field: 'Url', title: '链接', width: 300 }
+                  , { field: 'Content', title: '正文', width: 500 }
+                ]]
+                , done: function (res, curr, count) {
+                    $("#txtRecordNumber").text(count);
+                }
+            });
+        });
+    }
+
+    function DoDownload() {
+        var typeID = $("#ddlTypeID").val();
+        var calDateRange = $("#calDateRange").val();
+        var keyword = $("#txtKeywords").val();
+        var date = new Date();
+        var url = '../Logic/NewsCatchData.ashx';
+        $.ajax({
+            url: url,
+            data: {
+                type: 19,
+                typeID: typeID, 
+                period: calDateRange,
+                keyword: keyword
+            },
+            dataType: "text",
+            type: "GET",
+            traditional: true,
+            success: function (data) {
+                if (data == "0") {
+                    layer.alert("下载失败！");
+                }
+                else {
+                    window.open(data, "_parent");
+                }
+            },
+            error: function (e) {
+                layer.alert("下载失败！");
+            }
+        });
+    }
+
+    function JSONLength(obj) {
+        var size = 0, key;
+        for (key in obj) {
+            if (obj.hasOwnProperty(key)) size++;
+        }
+        return size;
+    }
+
+    function jsonDateFormat(jsonDate) {//json日期格式转换为正常格式
+        try {
+            var date = new Date(parseInt(jsonDate.replace("/Date(", "").replace(")/", ""), 10));
+            var month = date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1) : date.getMonth() + 1;
+            var day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
+            var hours = date.getHours();
+            var minutes = date.getMinutes();
+            var seconds = date.getSeconds();
+            var milliseconds = date.getMilliseconds();
+            if (date.getFullYear() <= 1) {
+                return "";
+            }
+            else {
+                return date.getFullYear() + "-" + month + "-" + day;
+            }
+        } catch (ex) {
+            return "";
+        }
+    }
+    function jsonDateTimeFormat(jsonDateTime) {//json日期格式转换为正常格式
+        try {
+            var date = new Date(parseInt(jsonDateTime.replace("/Date(", "").replace(")/", ""), 10));
+            var month = date.getMonth() + 1 < 10 ? "0" + (date.getMonth() + 1) : date.getMonth() + 1;
+            var day = date.getDate() < 10 ? "0" + date.getDate() : date.getDate();
+            var hours = date.getHours() < 10 ? "0" + date.getHours() : date.getHours();
+            var minutes = date.getMinutes() < 10 ? "0" + date.getMinutes() : date.getMinutes();
+            var seconds = date.getSeconds() < 10 ? "0" + date.getSeconds() : date.getSeconds();
+            var milliseconds = date.getMilliseconds();
+            return date.getFullYear() + "-" + month + "-" + day + " " + hours + ":" + minutes + ":" + seconds;
+        } catch (ex) {
+            return "";
+        }
+    }
+
+    function ShowWeioDate() {
+        layer.open({
+            type: 1,
+            shade: false,
+            title: "微博数据",
+            area: ['600px', '220px'], //宽高
+            content: $('#hideDiv')
+        });
+    }
+
+    function DoDownloadWeibo() {
+        var selectedDate = $("#calSelectedDate").val();
+        var cbxIsNoon = $("#cbxIsNoon").prop("checked");
+        var date = new Date();
+        var url = '../Logic/NewsCatchData.ashx';
+        $.ajax({
+            url: url,
+            data: {
+                type: 21,
+                selectedDate: selectedDate,
+                cbxIsNoon : cbxIsNoon,
+                date: date
+            },
+            dataType: "text",
+            type: "GET",
+            traditional: true,
+            success: function (data) {
+                if (data == "0") {
+                    layer.alert("未找到数据文件！");
+                }
+                else {
+                    window.open(data, "_parent");
+                }
+            },
+            error: function (e) {
+                layer.alert("下载失败！");
+            }
+        });
+    }
+
+    function ViewScreenshot() {
+        var date = new Date();
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var strDate = date.getFullYear() + "-" + month + "-" + day;
+        var url = "http://218.241.201.165:30008/Screenshots/" + strDate;
+        window.open(url);
+    }
+
+    function ViewCGTNScreenshot() {
+        var date = new Date();
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        var strDate = date.getFullYear() + "-" + month + "-" + day;
+        var url = "http://218.241.201.165:30008/CGTNScreenshots/" + strDate;
+        window.open(url);
+    }
+</script>
+</head>
+<body class="layui-layout-body">
+<div class="layui-layout layui-layout-admin">
+<div class="layui-header">
+<div class="layui-logo">主流媒体新闻监测数据</div>
+<ul class="layui-nav layui-layout-left">
+    <li class="layui-nav-item">
+    <a href="javascript:;">国内媒体数据</a>
+    <dl class="layui-nav-child">
+        <dd><a href="NewsAPP.htm">新闻内容</a></dd>
+        <dd><a href="javascript:void(0)" onclick="ViewScreenshot();">微博截屏</a></dd>
+        <dd><a href="javascript:void(0)" onclick="ShowWeioDate();">微博结果</a></dd>
+        <dd><a href="javascript:void(0)" onclick="ShowUpdateStatus();">更新状态</a></dd>
+    </dl>
+    </li>
+    <li class="layui-nav-item">
+    <a href="javascript:;">国外媒体数据</a>
+    <dl class="layui-nav-child">
+        <dd><a href="CGTNTopNews.htm">官网头条</a></dd>
+        <dd><a href="AccountList.htm">社交账号</a></dd>
+        <dd><a href="SocialPlatformFans.htm">社交粉丝</a></dd>
+    </dl>
+    </li>
+</ul>
+
+<ul class="layui-nav layui-layout-left">
+    <li class="layui-nav-item"></li>
+</ul>
+</div>
+  
+<div class="layui-body-full">
+<!-- 内容主体区域 -->
+<blockquote class="layui-elem-quote layui-text">
+新闻数据查询
+</blockquote>
+
+<fieldset class="layui-elem-field layui-field-title" style="margin-top: 20px;">
+  <legend style="font-size:14px;">检索条件</legend>
+</fieldset>
+
+<div class="crightSearch">
+    <form class="layui-form" action="">
+    <div class="layui-form-item">
+        <div class="layui-inline">
+          <label class="layui-form-label">APP平台：</label>
+          <div class="layui-input-inline">
+            <select id="ddlTypeID">
+                <option value="">默认不限</option>
+                <option value="1">央视新闻</option>
+                <option value="2">人民日报</option>
+                <option value="3">新华社</option>
+                <option value="5">央广新闻</option>
+                <option value="6">环球资讯+</option>
+                <option value="7">ChinaNews</option>
+              </select>
+          </div>
+        </div>
+         <div class="layui-inline">
+            <label class="layui-form-label">时间周期：</label>
+            <div class="layui-input-inline">
+                <input class="layui-input Input_Date" style="width:330px;" placeholder="日期范围：默认昨天" id="calDateRange"/>
+                <div class="InputDateInco"  style="left:300px;">
+				    <img src="images/InputDateInco.png" id="fromicon" alt=""/>
+				</div>
+            </div>
+        </div>  
+        <div class="layui-inline" style="padding-left:130px;">
+            <label class="layui-form-label">关键词：</label>
+            <div class="layui-input-inline">
+                <input class="layui-input Input_Date" placeholder="请输入检索关键词" id="txtKeywords"/>
+            </div>
+        </div>  
+      </div>
+    </form>
+</div>
+
+<div class="crightSearchBtn" style="padding-right:10px;">
+    <button class="layui-btn layui-btn-green" id="btnSearch" style="width:93px;">查 询</button>
+    <button class="layui-btn layui-btn-green" onclick="DoDownload();" id="btnDownload">下载结果</button>	
+</div>
+<fieldset class="layui-elem-field layui-field-title">
+  <legend style="font-size:14px;">查询结果</legend>
+</fieldset>
+<blockquote class="layui-elem-quote" style="margin-bottom:0px;"><p>根据您选择的条件，我们为您检索到 <span id="txtRecordNumber">-</span> 条记录</p></blockquote>
+<!--<button class="layui-btn layui-btn-sm" style="margin-left: 20px;" onmousedown="holdDown1()" onmouseup="holdUp()" onclick="ScrollToLeft();"><i class="layui-icon">&#xe603;</i></button>-->
+<!--<button class="layui-btn layui-btn-sm" style="float:right; margin-right: 20px;" onmousedown="holdDown2()" onmouseup="holdUp()" onclick="ScrollToRight();"><i class="layui-icon">&#xe602;</i></button>-->
+<table id="datalist">
+</table>
+
+<div class="Txtright mt20 mb20" style="padding-bottom:30px;padding-right:10px;">
+    
+</div> 
+
+</div>
+
+</div>
+
+
+<table class="layui-table" lay-skin="nob" lay-even style="display: none; margin-top: 0px;" id="tableUpdateStatus">
+  <colgroup>
+    <col width="150">
+    <col width="150">
+    <col width="200">
+    <col width="100">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>APP平台</th>
+      <th>数据日期</th>
+      <th>更新时间</th>
+      <th>状态</th>
+    </tr> 
+  </thead>
+  <tbody id="tbUpdateStatus">
+    <tr>
+      <td>央视新闻</td>
+      <td>2018-08-07</td>
+      <td></td>
+      <td>未开始</td>
+    </tr>
+    <tr>
+      <td>人民日报</td>
+      <td>2018-08-07</td>
+      <td></td>
+      <td>未开始</td>
+    </tr>
+    <tr>
+      <td>新华社</td>
+      <td>2018-08-07</td>
+      <td></td>
+      <td>未开始</td>
+    </tr>
+  </tbody>
+</table>
+
+<div id="hideDiv" style="display: none; padding-top: 20px;">
+
+<form class="layui-form" action="">
+    <div class="layui-form-item">
+         <div class="layui-inline">
+            <label class="layui-form-label">选择日期：</label>
+            <div class="layui-input-inline">
+                <input class="layui-input Input_Date" placeholder="默认昨天" id="calSelectedDate"/>
+                <div class="InputDateInco">
+				    <img src="images/InputDateInco.png" id="Img1" alt=""/>
+				</div>
+            </div>
+        </div>
+      </div>
+    <div class="layui-form-item">
+        <label class="layui-form-label">更多条件：</label>
+        <div class="layui-input-block">
+          <input type="checkbox" name="cbxIsNoon" id="cbxIsNoon" lay-skin="primary" title="是否0点-12点">
+        </div>
+      </div>
+</form>
+
+<div style=" text-align: center">
+    <button class="layui-btn layui-btn-green" onclick="DoDownloadWeibo()" id="btnDownloadWeibo">下载</button>	
+</div>
+</div>
+
+</body>
+</html>

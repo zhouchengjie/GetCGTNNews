@@ -1,0 +1,28 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title></title>
+    <script type="text/javascript" language="javascript">
+        window.onload = function () {
+            var id = getQueryString("id");
+            var iframe = document.createElement("iframe");
+            iframe.src = "https://xhpfmapi.zhongguowangshi.com/vh500/#/share/" + id;
+            document.body.appendChild(iframe);
+            setTimeout(function () {
+                window.opener = null;
+                window.open('', '_self');
+                window.close();
+            }, 5000);
+        }
+
+        function getQueryString(name) { 
+            var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)", "i"); 
+            var r = window.location.search.substr(1).match(reg); 
+            if (r != null) return unescape(r[2]); return null; 
+        } 
+    </script>
+</head>
+<body>
+</body>
+</html>
